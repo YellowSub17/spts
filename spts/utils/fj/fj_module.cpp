@@ -333,9 +333,14 @@ static PyObject *iterate_particle_motion(PyObject *self, PyObject *args, PyObjec
   PyObject *Z = (PyObject *)PyArray_SimpleNew(1, dims, NPY_DOUBLE);
   PyObject *V = (PyObject *)PyArray_SimpleNew(1, dims, NPY_DOUBLE);
   PyObject *A = (PyObject *)PyArray_SimpleNew(1, dims, NPY_DOUBLE);
-  double * Zdata = (double *) PyArray_DATA(Z);
-  double * Vdata = (double *) PyArray_DATA(V);
-  double * Adata = (double *) PyArray_DATA(A);
+
+  //double * Zdata = (double *) PyArray_DATA(Z);
+  //double * Vdata = (double *) PyArray_DATA(V);
+  //double * Adata = (double *) PyArray_DATA(A);
+  double* Zdata = static_cast<double*>(PyArray_DATA(reinterpret_cast<PyArrayObject*>(Z)));
+  double* Vdata = static_cast<double*>(PyArray_DATA(reinterpret_cast<PyArrayObject*>(V)));
+  double* Adata = static_cast<double*>(PyArray_DATA(reinterpret_cast<PyArrayObject*>(A)));
+
   for (i=0; i<N; i++) {
     Zdata[i] = z[i];
     Vdata[i] = v[i];
@@ -367,7 +372,8 @@ static PyMethodDef FjMethods[] = {
         NULL,                   
   };
 
-PyMODINIT_FUNC PyInit_initfj(void)
+//PyMODINIT_FUNC PyInit_initfj(void)
+PyMODINIT_FUNC PyInit_fj(void)
 {
   import_array();
   return PyModule_Create(&fjmodule);
