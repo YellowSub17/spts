@@ -2,6 +2,7 @@
 #include <numpy/arrayobject.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 PyDoc_STRVAR(calc_hists__doc__, "calc_hists(images, vmin, vmax, window_size, dx=1)\nRun this function on a stack of background images. vmin and vmax are the expected lowest and largest value that are within the noise. The window_size should not exceed the smallest feature that shall be detected from the denoised images.\n");
 static PyObject *calc_hists(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -24,9 +25,10 @@ static PyObject *calc_hists(PyObject *self, PyObject *args, PyObject *kwargs)
     return NULL;
   }
   
-  PyObject * images_array = PyArray_FROM_OTF(images_obj, NPY_INT, NPY_IN_ARRAY);
+  /* Cast the result of PyArray_FROM_OTF to PyArrayObject* */
+  PyArrayObject *images_array = (PyArrayObject *)PyArray_FROM_OTF(images_obj, NPY_INT, NPY_ARRAY_IN_ARRAY);
   if (images_array == NULL) {
-    Py_XDECREF(images_array);
+    /* PyArray_FROM_OTF already set an exception */
     return NULL;
   }
   int * images = (int *)PyArray_DATA(images_array);
@@ -45,33 +47,46 @@ static PyObject *calc_hists(PyObject *self, PyObject *args, PyObject *kwargs)
   hist_len = (vmax - vmin + dx) / dx;
  
   // Build pixel histograms
-  int * pixel_hists = (int *) calloc(N_pix*hist_len, sizeof(int));
+  int * pixel_hists = (int *) calloc((size_t)N_pix * (size_t)hist_len, sizeof(int));
+  if (pixel_hists == NULL) {
+    PyErr_SetString(PyExc_MemoryError, "Could not allocate pixel_hists");
+    Py_XDECREF(images_array);
+    return NULL;
+  }
   for (i = 0; i < N_images; i++) {
     for (j = 0; j < N_pix; j++) {
       v = images[i*N_pix+j];
       if ((v >= vmin) && (v <= vmax)) {
-	l = (v-vmin) / dx;
-	pixel_hists[j*hist_len+l] += 1;
+        l = (v-vmin) / dx;
+        pixel_hists[j*hist_len+l] += 1;
       } 
     }
   }
 
   // Combine to window histograms
-  int out_dim[] = {N_y, N_x, hist_len};
-  PyObject *window_hists_array = (PyObject *)PyArray_FromDims(3, out_dim, NPY_DOUBLE);
-  double * window_hists = (double *)PyArray_DATA(window_hists_array);
+  npy_intp out_dim[3] = {N_y, N_x, hist_len};
+  PyObject *window_hists_array = PyArray_SimpleNew(3, out_dim, NPY_DOUBLE);
+  if (window_hists_array == NULL) {
+    free(pixel_hists);
+    Py_XDECREF(images_array);
+    return NULL;
+  }
+  double * window_hists = (double *)PyArray_DATA((PyArrayObject *)window_hists_array);
+  /* initialize to zero (PyArray_SimpleNew should zero memory for numeric dtypes on many platforms but explicitly clear) */
+  memset(window_hists, 0, (size_t)N_pix * (size_t)hist_len * sizeof(double));
+
   for (j = 0; j < N_pix; j++) {
     x_corner = j % N_x - window_size/2;
     y_corner = j / N_x - window_size/2;
     if ((x_corner >= 0) && ((x_corner+window_size) <= N_x) && \
-	(y_corner >= 0) && ((y_corner+window_size) <= N_y)) {
+        (y_corner >= 0) && ((y_corner+window_size) <= N_y)) {
       for (i_x = 0; i_x < window_size; i_x++) {
-	for (i_y = 0; i_y < window_size; i_y++) {
-	  i_hist = (y_corner + i_y) * N_x + (x_corner + i_x);
-	  for (k = 0; k < hist_len; k++) {
-	    window_hists[j*hist_len+k] += pixel_hists[i_hist*hist_len+k];
-	  }
-	}
+        for (i_y = 0; i_y < window_size; i_y++) {
+          i_hist = (y_corner + i_y) * N_x + (x_corner + i_x);
+          for (k = 0; k < hist_len; k++) {
+            window_hists[j*hist_len+k] += pixel_hists[i_hist*hist_len+k];
+          }
+        }
       }
     }
   }
@@ -84,6 +99,7 @@ static PyObject *calc_hists(PyObject *self, PyObject *args, PyObject *kwargs)
   }
   
   free(pixel_hists);
+  Py_XDECREF(images_array); /* release the view/new ref returned by FROM_OTF */
   
   return window_hists_array;
 }
@@ -112,9 +128,8 @@ static PyObject *denoise(PyObject *self, PyObject *args, PyObject *kwargs)
     return NULL;
   }
   
-  PyObject * image_array = PyArray_FROM_OTF(image_obj, NPY_INT, NPY_IN_ARRAY);
+  PyArrayObject * image_array = (PyArrayObject *)PyArray_FROM_OTF(image_obj, NPY_INT, NPY_ARRAY_IN_ARRAY);
   if (image_array == NULL) {
-    Py_XDECREF(image_array);
     return NULL;
   }
   int * image = (int *)PyArray_DATA(image_array);
@@ -126,9 +141,9 @@ static PyObject *denoise(PyObject *self, PyObject *args, PyObject *kwargs)
     return NULL;
   }
 
-  PyObject * hists_bg_array = PyArray_FROM_OTF(hists_bg_obj, NPY_DOUBLE, NPY_IN_ARRAY);
+  PyArrayObject * hists_bg_array = (PyArrayObject *)PyArray_FROM_OTF(hists_bg_obj, NPY_DOUBLE, NPY_ARRAY_IN_ARRAY);
   if (hists_bg_array == NULL) {
-    Py_XDECREF(hists_bg_array);
+    Py_XDECREF(image_array);
     return NULL;
   }
   double * hists_bg = (double *)PyArray_DATA(hists_bg_array);
@@ -148,44 +163,57 @@ static PyObject *denoise(PyObject *self, PyObject *args, PyObject *kwargs)
   int hist_len = (vmax - vmin + dx) / dx;
 
   // Build window pixel histograms from image
-  int * hists_image = (int *) calloc(N_pix*full_hist_len, sizeof(int));
+  int * hists_image = (int *) calloc((size_t)N_pix * (size_t)full_hist_len, sizeof(int));
+  if (hists_image == NULL) {
+    PyErr_SetString(PyExc_MemoryError, "Could not allocate hists_image");
+    Py_XDECREF(hists_bg_array);
+    Py_XDECREF(image_array);
+    return NULL;
+  }
   for (j = 0; j < N_pix; j++) {
     x_corner = j % N_x - window_size/2;
     y_corner = j / N_x - window_size/2;
     if ((x_corner >= 0) && ((x_corner+window_size) <= N_x) && \
-	(y_corner >= 0) && ((y_corner+window_size) <= N_y)) {
+        (y_corner >= 0) && ((y_corner+window_size) <= N_y)) {
       for (i_x = 0; i_x < window_size; i_x++) {
-	for (i_y = 0; i_y < window_size; i_y++) {
-	  i = (y_corner + i_y) * N_x + (x_corner + i_x);
-	  v = image[i];
-	  k = (v - vmin_full) / dx;
-	  if ((v >= vmin_full) && (v <= vmax_full)) {
-	    hists_image[j*full_hist_len+k] += 1;
-	  } else if (v > vmax_full) {
-	    // If above range add to last bin
-	    k = full_hist_len - 1;
-	    hists_image[j*full_hist_len+k] += 1;
-	  }
-	}
+        for (i_y = 0; i_y < window_size; i_y++) {
+          i = (y_corner + i_y) * N_x + (x_corner + i_x);
+          v = image[i];
+          k = (v - vmin_full) / dx;
+          if ((v >= vmin_full) && (v <= vmax_full)) {
+            hists_image[j*full_hist_len+k] += 1;
+          } else if (v > vmax_full) {
+            // If above range add to last bin
+            k = full_hist_len - 1;
+            hists_image[j*full_hist_len+k] += 1;
+          }
+        }
       }
     }
   }
 
-  //puts("Guard 1");
-  
   // Compare and score
-  int out_dim[] = {N_y, N_x};
-  PyObject * scores_array = (PyObject *)PyArray_FromDims(2, out_dim, NPY_DOUBLE);
-  double * scores = (double *)PyArray_DATA(scores_array);
+  npy_intp out_dim2[2] = {N_y, N_x};
+  PyObject * scores_array = PyArray_SimpleNew(2, out_dim2, NPY_DOUBLE);
+  if (scores_array == NULL) {
+    free(hists_image);
+    Py_XDECREF(hists_bg_array);
+    Py_XDECREF(image_array);
+    return NULL;
+  }
+  double * scores = (double *)PyArray_DATA((PyArrayObject *)scores_array);
+  /* init */
+  memset(scores, 0, (size_t)N_pix * sizeof(double));
+
   for (j = 0; j < N_pix; j++) {
     scores[j] = 0.;
     for (k = 0; k < full_hist_len; k++) {
       v = vmin_full + k * dx;
       if ((v >= vmin) && (v <= vmax)) {
-	l = (v-vmin)/dx;
-	n_bg = hists_bg[j*hist_len+l];
+        l = (v-vmin)/dx;
+        n_bg = (int) hists_bg[j*hist_len+l];
       } else {
-	n_bg = 0;
+        n_bg = 0;
       }
       n_img = hists_image[j*full_hist_len+k];
       // Weighted subtraction of histograms
@@ -194,9 +222,9 @@ static PyObject *denoise(PyObject *self, PyObject *args, PyObject *kwargs)
   }
   
   free(hists_image);
+  Py_XDECREF(hists_bg_array);
+  Py_XDECREF(image_array);
 
-  //puts("Guard 2");
-  
   return scores_array;
 }
 
@@ -220,6 +248,7 @@ static PyMethodDef DenoiseMethods[] = {
 
 PyMODINIT_FUNC PyInit_initdenoise(void)
 {
+  /* Initialize NumPy C-API */
   import_array();
 
   PyObject *dmodule = PyModule_Create(&denoisemodule);
@@ -229,4 +258,3 @@ PyMODINIT_FUNC PyInit_initdenoise(void)
 
   return dmodule;
 }
-
