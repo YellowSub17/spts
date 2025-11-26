@@ -30,3 +30,4 @@ Install  dependencies using `pip install`/`pip3 install` or conda (pip links pro
 ## TO-DOs 
 * In the `analysis.py` function, label integration method doesn't work yet. This needs to be looked into in the future,
 so that when this is used, it works... 
+# spts-analysis
