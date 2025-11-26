@@ -1,32 +1,47 @@
-### Python 3 version of spts 
-In this repository, [spts](https://github.com/mhantke/spts) is being developed further in Python 3 after
-migration of Python 2 code to Python 3. Compatible with Python versions >= 3.7. 
+# SPTS - single particle tracking and sizing
 
-## Installing spts
-To install spts, start by cloning this repository:
-```bash
-git clone https://github.com/Toonggg/spts.git
+
+### Installation
+
+Create a conda environment.
 ```
-Before installing, make sure to check that your system supports the compatible Python versions:
-```bash
-which python 
-which python3 
+conda create -n spts313 python==3.13
 ```
-If only Python 3 is installed in your (current) environment, install in the following way: 
-```bash
-python setup.py install
+Activate the environment.
 ```
-Otherwise, it is important to use `python3`:
-```bash
-python3 setup.py install
+conda activate spts
 ```
 
-### Dependencies
-Install  dependencies using `pip install`/`pip3 install` or conda (pip links provided in list below):
-* [expiringdict](https://pypi.org/project/expiringdict/)
-* [olefile](https://pypi.org/project/olefile/)
-* [typing](https://pypi.org/project/typing/)
+Install the required packages.
+```
+conda install numpy -y
+conda install cython -y
+conda install h5py -y
+conda install ipykernel -y
+conda install scipy -y
+conda install matplotlib -y
+conda install pyqtgraph -y
+conda install pyqt5 -y
+conda install -c conda-forge expiringdict -y
+conda install -c conda-forge olefile -y
+conda install -c conda-forge typing -y
+```
 
-## TO-DOs 
-* In the `analysis.py` function, label integration method doesn't work yet. This needs to be looked into in the future,
-so that when this is used, it works... 
+Get Max H. packages.
+```
+git clone https://github.com/YellowSub17/spts.git
+git clone https://github.com/YellowSub17/mulpro.git
+git clone https://github.com/YellowSub17/h5writer.git
+```
+
+Install Max H. packages.
+```
+cd mulpro; python setup.py install; cd ../
+cd spts; python setup.py install; cd ../
+cd h5writer; python setup.py install; cd ../
+```
+
+Install jupyter notebook kernel.
+```
+python -m ipykernel install --user --name spts --display-name "Python (spts)"
+```
