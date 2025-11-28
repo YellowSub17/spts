@@ -6,11 +6,11 @@ class CXDReader:
     def __init__(self, filename):
         self._ole = olefile.OleFileIO(filename)
         self._n = unpack('i',self._ole.openstream('File Info/Field Count').read())[0]
-        self._closed = False 
-        
+        self._closed = False
+
     def get_number_of_frames(self):
         return self._n
-        
+
     def get_frame(self, i):
         if not i < self._n:
             return None
@@ -26,10 +26,13 @@ class CXDReader:
             img = np.frombuffer(data, dtype=dtype).reshape((height,width))
             return img
 
+    # def get_frames_iter():
+        # return map(self.get_frame, [i for i in range(self._n)])
+
+
     def close(self):
         self._ole.close()
         self._closed = True
 
     def is_closed(self):
         return self._closed
-        

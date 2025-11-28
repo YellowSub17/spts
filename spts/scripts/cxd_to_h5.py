@@ -8,8 +8,8 @@ import numpy as np
 from scipy.ndimage import percentile_filter
 import scipy.ndimage
 
-import sys
 
+import os
 import h5writer
 import h5py
 import spts
@@ -21,7 +21,7 @@ import matplotlib.patches
 from matplotlib.colors import LogNorm
 
 
-def estimate_background(filename_bg_cxd, bg_frames_max, filename):
+def estimate_background(filename_bg_cxd, bg_frames_max, filename, read_cache=True):
     print("*************************************")
     print("*   Background correction section   *")
     print("*************************************")
@@ -32,31 +32,28 @@ def estimate_background(filename_bg_cxd, bg_frames_max, filename):
             return None, None, None
 
     f_cache = filename_bg_cxd[:-4] + '_bg_' + str(bg_frames_max) + ".h5"
-    bg = None
-    try:
-        f = h5py.File(f_cache, 'r')
+
+    if read_cache and os.path.isfile(f_cache):
         print("Reading cached background from %s" % (f_cache))
-        bg = f['bg'][:]
-        bg_std = f['bg_std'][:]
-        good_pixels = f['good_pixels'][:]
+        with h5py.File(f_cache, 'r') as f:
+            bg = f['bg'][:]
+            bg_std = f['bg_std'][:]
+            good_pixels = f['good_pixels'][:]
         print("Mean over mean background = %.0f" % (np.mean(bg)))
         print("Std dev over mean background = %.0f" % (np.std(bg)))
         return bg, bg_std, good_pixels
-    except OSError:
-        pass
+    print('No cached background found. Generating new cache.')
 
     Rbg = CXDReader(filename_bg_cxd)
     N = min([bg_frames_max, Rbg.get_number_of_frames()])
     print("Collecting %d background frames..." % (N), end='')
-    for i in range(N):
-        frame = Rbg.get_frame(i)  # dtype: uint16
 
-        if i == 0:
-            shape = (frame.shape[0], frame.shape[1], N)
-            bg_stack = np.zeros(shape, dtype=frame.dtype)  # background stack
+    frames_map = map(Rbg.get_frame, [i for i in range(N)])
 
-        bg_stack[:, :, i] = frame[:, :]
-    print("done")
+    bg_stack = np.array(list(frames_map), dtype=np.uint16)
+
+    bg_stack = bg_stack.transpose((1,2,0))
+    print("done.")
 
     print("Calculating background estimate by mean of buffer...", end='')
     bg = np.mean(bg_stack, axis=2)
@@ -69,51 +66,30 @@ def estimate_background(filename_bg_cxd, bg_frames_max, filename):
     middle_std = np.std(middle_bg)
     good_pixels = bg < np.mean(middle_bg)+middle_std*6
     bg *= good_pixels
-    print("done")
+    print("done.")
     print("Found %d bad pixels" % (good_pixels == 0).sum())
 
     print("Mean over mean background = %.0f" % (np.mean(bg)))
     print("Std dev over mean background = %.0f" % (np.std(bg)))
 
-    f = h5py.File(f_cache, 'w')
-    f.create_dataset('bg', data=bg)
-    f.create_dataset('bg_std', data=bg_std)
-    f.create_dataset('good_pixels', data=good_pixels)
-    f.close()
 
-    # Make a small report
-    report_fname = filename_bg_cxd[:-4]+"_bg_report.pdf"
-    print("Writing report to %s..." % (report_fname), end='')
-    fig, ax = plt.subplots(2, 2, figsize=(20, 14))
-    pos = ax[0][0].imshow(bg*good_pixels)
-    ax[0][0].set_title('Median frame')
-    fig.colorbar(pos, ax=ax[0][0])
-    ax[0][1].imshow(bg_std*good_pixels)
-    ax[0][1].set_title('Per pixel std deviation')
-    fig.colorbar(pos, ax=ax[0][1])
-    ax[1][0].imshow(good_pixels == 0)
-    ax[1][0].set_title('Bad pixels')
-    ax[1][1].plot(np.mean(bg_stack, axis=(0, 1)))
-    ax[1][1].set_title('Mean intensity by frame')
+    print("Writing out h5...", end='')
 
-    try:
-        plt.savefig(report_fname)
-        print("\nReport saved succesfully!!!")
-    except IOError:
-        pass
+    with h5py.File(f_cache, 'w') as f:
+        f.create_dataset('bg_stack', data=bg_stack)
+        f.create_dataset('bg', data=bg)
+        f.create_dataset('bg_std', data=bg_std)
+        f.create_dataset('good_pixels', data=good_pixels)
 
-    try:
-        if(not args.quiet):
-            plt.show()
-    except:
-        pass
+    print("done.")
 
-    print("done")
+
+
 
     return bg, bg_std, good_pixels
 
 
-def estimate_flatfield(flatfield_filename, ff_frames_max, bg, good_pixels):
+def estimate_flatfield(flatfield_filename, ff_frames_max, bg, good_pixels, read_cache=True):
     print("*************************************")
     print("*   Flat field correction section   *")
     print("*************************************")
@@ -124,17 +100,21 @@ def estimate_flatfield(flatfield_filename, ff_frames_max, bg, good_pixels):
             return None, None
 
     f_cache = flatfield_filename[:-4] + '_ff_' + str(ff_frames_max) + ".h5"
-    ff = None
-    try:
-        f = h5py.File(f_cache, 'r')
-        print("Reading cached background from %s" % (f_cache))
-        ff = f['ff'][:]
-        ff_std = f['ff_std'][:]
+
+    if read_cache and os.path.isfile(f_cache):
+        print("Reading cached flat field from %s" % (f_cache))
+        with h5py.File(f_cache, 'r') as f:
+            ff = f['ff'][:]
+            ff_std = f['ff_std'][:]
+
         print("Mean over median flatfield = %.0f" % (np.mean(ff)))
         print("Std dev over median flatfield = %.0f" % (np.std(ff)))
         return ff, ff_std
-    except OSError:
-        pass
+
+    print('No cached flatfield found. Generating new cache.')
+
+
+
 
     print("Collecting flat-field frames...", end='')
 
@@ -149,17 +129,24 @@ def estimate_flatfield(flatfield_filename, ff_frames_max, bg, good_pixels):
         print("Warning: Background information is missing. Using median of the 1st frame as background.")
         bg = np.median(frame.flatten())
 
-    shape = (N, frame.shape[0], frame.shape[1])
-    ff_stack = np.zeros(shape, dtype=np.float32)  # background stack
 
-    com_stack = np.zeros((N, 2))
-    for i in range(N):
-        frame = R.get_frame(i)  # dtype: uint16
-        ff_stack[i, :, :] = (np.ndarray.astype(
-            frame, dtype='float32') - bg)*good_pixels
-        com_stack[i] = scipy.ndimage.center_of_mass(ff_stack[i])
+    ff_map = map(R.get_frame, [i for i in range(N)])
+    ff_stack = np.array(list(ff_map), dtype=np.float32)
+    # ff_stack = ff_stack.transpose((1,2,0))
+
+    ff_stack -=bg
+    ff_stack *= good_pixels
+
+    com_map = map(scipy.ndimage.center_of_mass, ff_stack)
+    com_stack = np.array(list(com_map))
+
+
+
 
     print("done")
+
+
+
     print("Calculating flatfield correction estimate by median of buffer... ", end='')
     ff = np.median(ff_stack, axis=0)
     ff_std = np.std(ff_stack, axis=0)
@@ -179,49 +166,11 @@ def estimate_flatfield(flatfield_filename, ff_frames_max, bg, good_pixels):
     print("Center of mass std dev of flatfield = %.0f,%.0f" %
           (com_std[0], com_std[1]))
 
-    f = h5py.File(f_cache, 'w')
-    f.create_dataset('ff', data=ff)
-    f.create_dataset('ff_std', data=ff_std)
-    f.close()
+    with h5py.File(f_cache, 'w') as f:
+        f.create_dataset('ff', data=ff) #median through image axis: shape=2048x2048
+        f.create_dataset('ff_std', data=ff_std) #std through image axis: shape=2048x2048
 
-    # Make a small report
-    report_fname = flatfield_filename[:-4]+"_ff_report.pdf"
-    print("Writing report to %s..." % (report_fname), end='')
-    fig, ax = plt.subplots(2, 2, figsize=(20, 14))
-    fig.suptitle('Flatfield report for %s' % (flatfield_filename), fontsize=16)
-    pos = ax[0][0].imshow(ff)
-    ax[0][0].set_title('Median frame')
-    fig.colorbar(pos, ax=ax[0][0])
-    pos = ax[0][1].imshow(ff_std)
-    ax[0][1].set_title('Per pixel std deviation')
-    fig.colorbar(pos, ax=ax[0][1])
 
-    ax[1][0].plot(np.mean(ff_stack, axis=(1, 2)))
-    ax[1][0].set_title('Mean intensity by frame')
-    ff_stack_mean = np.mean(ff_stack, axis=0)
-    #pos = ax[1][1].imshow(ff_stack_mean, vmin=0, vmax=np.percentile(ff_stack_mean.flatten(), 99.99))
-
-    import copy
-    # Use special colormap to avoid seeing value below 1
-    my_cmap = copy.copy(plt.get_cmap())
-    my_cmap.set_bad(my_cmap.colors[0])
-    pos = ax[1][1].imshow(ff, norm=LogNorm(vmin=1), cmap=my_cmap)
-    ax[1][1].set_title('Median frame (log scale)')
-    fig.colorbar(pos, ax=ax[1][1])
-
-    try:
-        plt.savefig(report_fname)
-        print("\nReport saved succesfully!!!")
-    except IOError:
-        pass
-
-    try:
-        if(not args.quiet):
-            plt.show()
-    except:
-        pass
-
-    print("done")
 
     return ff, ff_std
 
@@ -270,66 +219,7 @@ def guess_ROI(ff, flatfield_filename, ff_low_limit, roi_fraction):
     print("Auto cropping to y = %d:%d x = %d:%d" % (ymin, ymax, xmin, xmax))
     roi = (slice(ymin, ymax, None), slice(xmin, xmax, None))
 
-    # Make a small report
-    report_fname = flatfield_filename[:-4]+"_roi_report.pdf"
-    print("Writing report to %s..." % (report_fname), end='')
-    fig, ax = plt.subplots(2, 2, figsize=(20, 14))
-    fig.suptitle('Flatfield ROI report for %s' %
-                 (flatfield_filename), fontsize=16)
-    pos = ax[0][0].imshow(ff)
-    ax[0][0].set_title('Median frame')
-    # Create a Rectangle with the ROI
-    rect = matplotlib.patches.Rectangle(
-        (xmin, ymin), xmax-xmin+1, ymax-ymin+1, linewidth=1, edgecolor='w', facecolor='none', ls=':')
-    ax[0][0].add_patch(rect)
-    fig.colorbar(pos, ax=ax[0][0])
 
-    import copy
-    # Use special colormap to avoid seeing value below 1
-    my_cmap = copy.copy(plt.get_cmap())
-    my_cmap.set_bad(my_cmap.colors[0])
-    pos = ax[0][1].imshow(ff, norm=LogNorm(vmin=1), cmap=my_cmap)
-    ax[0][1].set_title('Median frame (log scale)')
-    # Create a Rectangle with the ROI
-    rect = matplotlib.patches.Rectangle(
-        (xmin, ymin), xmax-xmin+1, ymax-ymin+1, linewidth=1, edgecolor='w', facecolor='none', ls=':')
-    ax[0][1].add_patch(rect)
-    fig.colorbar(pos, ax=ax[0][1])
-    ff_roi = ff[roi]
-    pos = ax[1][0].imshow(ff_roi, extent=[xmin, xmax, ymax, ymin])
-
-    ax[1][0].axvline(x=com_x, color='black', linestyle=':')
-    ax[1][0].axhline(y=com_y, color='black', linestyle=':')
-    ax[1][0].set_title('Median frame ROI')
-    fig.colorbar(pos, ax=ax[1][0])
-    ax[1][1].plot(np.arange(xmin, xmax),
-                  ff_roi[round(com_y-ymin), :], label='horizontal')
-    ax[1][1].plot(np.arange(ymin, ymax),
-                  ff_roi[:, round(com_x-xmin)], label='vertical')
-    ax[1][1].grid(True)
-    ax[1][1].legend(loc="upper right")
-    ax[1][1].set_title('Lineout through the center of ROI')
-
-    bottom_notes = 'COM y = %d x = %d ROI y = %d:%d x = %d:%d. ' % (
-        com_y, com_x, ymin, ymax, xmin, xmax)
-    bottom_notes += 'Area above threshold (%d) = %d px. ' % (
-        ff_low_limit, (ff_roi > ff_low_limit).sum())
-    plt.figtext(0.05, 0.05, bottom_notes, fontsize=10, ha='left')
-
-    try:
-        plt.savefig(report_fname)
-        print("\nReport saved succesfully!!!")
-    except IOError:
-        pass
-
-    plt.savefig(report_fname)
-    try:
-        if(not args.quiet):
-            plt.show()
-    except:
-        pass
-
-    print("done")
     return roi
 
 
@@ -375,10 +265,16 @@ def cxd_to_h5(filename_cxd,  bg, ff, roi, good_pixels, filename_cxi, do_percent_
     integratedsq_raw = None
     integratedsq_image = None
 
-    # Write frames
-    for i in range(N):
 
-        frame = R.get_frame(i)
+    print('Generateing frames map...', end='')
+    frames = map(R.get_frame, [i for i in range(N)])
+    print('done.')
+    for i, frame in enumerate(frames):
+    # Write frames
+    # for i in range(N):
+
+
+
 
         bg_corr = None
         if(do_percent_filter):
@@ -390,7 +286,7 @@ def cxd_to_h5(filename_cxd,  bg, ff, roi, good_pixels, filename_cxi, do_percent_
 
         print('(%d/%d) Writing frames...' % (i+1, N), end='\r')
 
-        frame = R.get_frame(i)
+        # frame = R.get_frame(i)
         image_raw = frame[roi]*good_pixels[roi]
 
         out = {}
@@ -426,6 +322,7 @@ def cxd_to_h5(filename_cxd,  bg, ff, roi, good_pixels, filename_cxi, do_percent_
                     shape=image_bgcor.shape, dtype='float32')
             integrated_image += image_bgcor
             integratedsq_image += np.asarray(image_bgcor, dtype='f')**2
+
     # Print newline
     print('(%d/%d) Writing frames...done.' % (N, N))
     # Write integrated images
@@ -453,43 +350,8 @@ def cxd_to_h5(filename_cxd,  bg, ff, roi, good_pixels, filename_cxi, do_percent_
     out["entry_1"]["image_1"]["roi"] = [
         roi[0].start, roi[0].stop, roi[1].start, roi[1].stop]
     W.write_solo(out)
-    print('done.')
     # Close readers
     R.close()
-
-    # Make a small report
-    report_fname = filename_cxd[:-4]+"_report.pdf"
-    print("Writing report to %s..." % (report_fname), end='')
-
-    fig, ax = plt.subplots(2, 2, figsize=(20, 14))
-    if bg is not None:
-        pos = ax[0][0].imshow(bg[roi])
-        ax[0][0].set_title('Background')
-        fig.colorbar(pos, ax=ax[0][0])
-    if ff is not None:
-        pos = ax[1][0].imshow(ff[roi])
-        ax[1][0].set_title('Flatfield')
-        fig.colorbar(pos, ax=ax[1][0])
-    if integrated_raw is not None:
-        pos = ax[0][1].imshow(integrated_raw)
-        ax[0][1].set_title('Integrated Raw')
-        fig.colorbar(pos, ax=ax[0][1])
-    if integrated_image is not None:
-        pos = ax[1][1].imshow(integrated_image)
-        ax[1][1].set_title('Integrated Image')
-        fig.colorbar(pos, ax=ax[1][1])
-
-    try:
-        plt.savefig(report_fname)
-        print("\nReport saved succesfully!!!")
-    except IOError:
-        pass
-
-    try:
-        if(not args.quiet):
-            plt.show()
-    except:
-        pass
 
     print("done.")
 
@@ -576,4 +438,3 @@ if __name__ == "__main__":
     W.close()
     if args.skip_raw:
         h5py.File(f_out,'r+')['entry_1']['data_1']['data'] = h5py.SoftLink('/entry_1/image_1/data')
-        
