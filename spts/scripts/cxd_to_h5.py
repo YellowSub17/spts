@@ -5,6 +5,7 @@ import sys
 import olefile
 import numpy as np
 
+import scipy
 from scipy.ndimage import percentile_filter
 import scipy.ndimage
 
@@ -21,72 +22,100 @@ import matplotlib.patches
 from matplotlib.colors import LogNorm
 
 
-def estimate_background(filename_bg_cxd, bg_frames_max, filename, read_cache=True):
+def estimate_background(filename_bg_cxd, bg_frames_max, read_cache=True, hist_bins=100):
     print("*************************************")
     print("*   Background correction section   *")
     print("*************************************")
-    if(filename_bg_cxd is None):
-        filename_bg_cxd = filename[:-4] + "_bg.cxd"
-        if not os.path.isfile(filename_bg_cxd):
-            print("Background file missing!")
-            return None, None, None
+ #    if(filename_bg_cxd is None):
+        # filename_bg_cxd = filename[:-4] + "_bg.cxd"
+        # if not os.path.isfile(filename_bg_cxd):
+            # print("Background file missing!")
+            # return None, None, None
 
     f_cache = filename_bg_cxd[:-4] + '_bg_' + str(bg_frames_max) + ".h5"
 
     if read_cache and os.path.isfile(f_cache):
-        print("Reading cached background from %s" % (f_cache))
+        print(f"Reading cached background from {f_cache}")
         with h5py.File(f_cache, 'r') as f:
             bg = f['bg'][:]
             bg_std = f['bg_std'][:]
             good_pixels = f['good_pixels'][:]
-        print("Mean over mean background = %.0f" % (np.mean(bg)))
-        print("Std dev over mean background = %.0f" % (np.std(bg)))
+        print(f"Mean over mean background = {np.mean(bg):.0f}")
+        print(f"Std dev over mean background = {np.std(bg):.0f}")
         return bg, bg_std, good_pixels
+
     print('No cached background found. Generating new cache.')
 
-    Rbg = CXDReader(filename_bg_cxd)
-    N = min([bg_frames_max, Rbg.get_number_of_frames()])
-    print("Collecting %d background frames..." % (N), end='')
+    reader = CXDReader(filename_bg_cxd)
+    N = min([bg_frames_max, reader.get_number_of_frames()])
+    print(f"Collecting {N} background frames...",  end='')
 
-    frames_map = map(Rbg.get_frame, [i for i in range(N)])
+    frames_map = map(reader.get_frame, [i for i in range(N)])
 
     bg_stack = np.array(list(frames_map), dtype=np.uint16)
 
     bg_stack = bg_stack.transpose((1,2,0))
     print("done.")
 
+
+
     print("Calculating background estimate by mean of buffer...", end='')
-    bg = np.mean(bg_stack, axis=2)
+    bg_mean = np.mean(bg_stack, axis=2)
     bg_std = np.std(bg_stack, axis=2)
 
     # Use the standard deviation of the 50% middle values to find
     # bad pixels
-    sort_bg = np.sort(bg.flatten())
-    middle_bg = sort_bg[round(len(sort_bg)/4):-round(len(sort_bg)/4)]
-    middle_std = np.std(middle_bg)
-    good_pixels = bg < np.mean(middle_bg)+middle_std*6
-    bg *= good_pixels
-    print("done.")
-    print("Found %d bad pixels" % (good_pixels == 0).sum())
+    sort_bg = np.sort(bg_mean.flatten())
+    middle_bg = sort_bg[round(len(sort_bg)/4):-round(len(sort_bg)/4)] #get the middle half (exclude Q1/Q4)
+    middle_std = np.std(middle_bg) #stand deviation of the middle half
 
-    print("Mean over mean background = %.0f" % (np.mean(bg)))
-    print("Std dev over mean background = %.0f" % (np.std(bg)))
+
+    good_pixels = np.logical_and(bg_mean < np.mean(middle_bg)+middle_std*6, bg_mean > np.mean(middle_bg)-middle_std*6)
+
+    n_bad_pixels = (good_pixels==0).sum()
+    n_good_pixels = (good_pixels==1).sum()
+
+    #mask the bad pixels out
+    bg_mean[~good_pixels] = 0
+    bg_stack[~good_pixels, :] = 0
+
+    #calcualte stack-mean
+    bg_sub_mean_stack = bg_stack - bg_mean[..., np.newaxis]
+
+    bg_hist, bg_bins = np.histogram(bg_sub_mean_stack[good_pixels,:].flatten(), bins=hist_bins, range=(-25,25), density=True)
+
+    mu_mle, sigma_mle = scipy.stats.norm.fit(bg_sub_mean_stack[good_pixels,:].flatten())
+
+
+
+    print("done.")
+    print(f"Found {n_bad_pixels} bad pixels and {n_good_pixels} good pixels." )
+
+
+    print(f"Mean over mean background = {np.mean(bg_mean):.0f}")
+    print(f"Std dev over mean background = {np.std(bg_mean):.0f}")
 
 
     print("Writing out h5...", end='')
 
     with h5py.File(f_cache, 'w') as f:
-        f.create_dataset('bg_stack', data=bg_stack)
-        f.create_dataset('bg', data=bg)
+        # f.create_dataset('bg_stack', data=bg_stack) #no need to save the stack twice.
+        f.create_dataset('bg', data=bg_mean) #for backwards compatability
+        f.create_dataset('bg_mean', data=bg_mean)
         f.create_dataset('bg_std', data=bg_std)
         f.create_dataset('good_pixels', data=good_pixels)
+        f.create_dataset('bg_bins', data=bg_bins)
+        f.create_dataset('bg_hist', data=bg_hist)
+
+        f.create_dataset('mu_mle', data=mu_mle)
+        f.create_dataset('sigma_mle', data=sigma_mle)
 
     print("done.")
 
 
 
 
-    return bg, bg_std, good_pixels
+    return bg_mean, bg_std, good_pixels, bg_stack, bg_bins, bg_hist, mu_mle, sigma_mle
 
 
 def estimate_flatfield(flatfield_filename, ff_frames_max, bg, good_pixels, read_cache=True):
