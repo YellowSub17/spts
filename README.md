@@ -22,7 +22,6 @@ conda install pyqtgraph==0.13.7 -y
 conda install pyqt==5.15.11 -y
 conda install -c conda-forge olefile==0.47 -y
 conda install -c conda-forge expiringdict -y
-conda install -c conda-forge typing -y
 ```
 
 Activate the environment.
