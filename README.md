@@ -10,7 +10,18 @@ git clone git@github.com:YellowSub17/spts.git
 
 Create a conda environment.
 ```
-conda create -f spts/env.yml
+conda create --name spts python==3.13
+conda install numpy==2.3.5 -y
+conda install cython==3.2.2 -y
+conda install h5py==3.15.1 -y
+conda install ipykernel==6.31.0 -y
+conda install scipy==1.16.3 -y
+conda install matplotlib==3.10.7 -y
+conda install pyqtgraph==0.13.7 -y
+conda install pyqt==5.15.11 -y
+conda install -c conda-forge olefile==0.47 -y
+conda install -c conda-forge expiringdict -y
+conda install -c conda-forge typing -y
 ```
 
 Activate the environment.
