@@ -10,7 +10,7 @@ git clone git@github.com:YellowSub17/spts.git
 
 Create a conda environment.
 ```
-conda create --name spts python=3.13
+conda create --name spts python=3.13 -y 
 conda activate spts
 conda install numpy==2.3.5 -y
 conda install cython==3.2.2 -y
