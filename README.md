@@ -3,6 +3,11 @@
 
 ### Installation
 
+Clone this repo.
+```
+git clone https://github.com/YellowSub17/spts
+```
+
 Create a conda environment.
 ```
 conda create -n spts313 python==3.13
