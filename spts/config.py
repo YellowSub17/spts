@@ -12,7 +12,7 @@ def read_configfile(configfile):
     """
     config = configparser.ConfigParser()
     with open(configfile,"r") as f:
-        config.readfp(f)
+        config.read_file(f)
         confDict = {}
         for section in config.sections(): 
             confDict[section] = {}

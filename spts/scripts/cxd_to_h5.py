@@ -84,7 +84,7 @@ def estimate_background(filename_bg_cxd, bg_frames_max, read_cache=True, hist_bi
 
     bg_hist, bg_bins = np.histogram(bg_sub_mean_stack[good_pixels,:].flatten(), bins=hist_bins, range=(-25,25), density=True)
 
-    mu_mle, sigma_mle = scipy.stats.norm.fit(bg_sub_mean_stack[good_pixels,:].flatten())
+    # mu_mle, sigma_mle = scipy.stats.norm.fit(bg_sub_mean_stack[good_pixels,:].flatten())
 
 
 
@@ -107,16 +107,15 @@ def estimate_background(filename_bg_cxd, bg_frames_max, read_cache=True, hist_bi
         f.create_dataset('bg_bins', data=bg_bins)
         f.create_dataset('bg_hist', data=bg_hist)
 
-        f.create_dataset('mu_mle', data=mu_mle)
-        f.create_dataset('sigma_mle', data=sigma_mle)
+        #f.create_dataset('mu_mle', data=mu_mle)
+        #f.create_dataset('sigma_mle', data=sigma_mle)
 
     print("done.")
 
 
 
 
-    return bg_mean, bg_std, good_pixels, bg_stack, bg_bins, bg_hist, mu_mle, sigma_mle
-
+    return bg_mean, bg_std, good_pixels, bg_stack, bg_bins, bg_hist
 
 def estimate_flatfield(flatfield_filename, ff_frames_max, bg, good_pixels, read_cache=True):
     print("*************************************")

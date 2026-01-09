@@ -4,6 +4,7 @@ import logging
 logger = logging.getLogger("MSI_GUI")
 
 from PyQt5 import QtCore, QtGui
+from PyQt5.QtWidgets import QFileDialog
 
 class Options:
     def __init__(self, mainWindow):
@@ -77,7 +78,7 @@ class GeneralBox:
         self.w.conf["general"]["output_level"] = self.outputLevelComboBox.currentIndex()
 
     def _on_open_data(self):
-        filename = QtGui.QFileDialog.getOpenFileName(self.w, "Open CXI data file", "", "CXI Files (*.cxi)")
+        filename = QFileDialog.getOpenFileName(self.w, "Open CXI data file", "", "CXI Files (*.cxi)")
         if isinstance(filename, tuple):
             if filename[0]:
                 filename = filename[0]
