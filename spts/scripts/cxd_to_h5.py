@@ -37,12 +37,11 @@ def estimate_background(filename_bg_cxd, bg_frames_max, read_cache=True, hist_bi
     if read_cache and os.path.isfile(f_cache):
         print(f"Reading cached background from {f_cache}")
         with h5py.File(f_cache, 'r') as f:
-            bg = f['bg'][:]
-            bg_std = f['bg_std'][:]
+            bg_mean = f['bg_mean'][:]
             good_pixels = f['good_pixels'][:]
-        print(f"Mean over mean background = {np.mean(bg):.0f}")
-        print(f"Std dev over mean background = {np.std(bg):.0f}")
-        return bg, bg_std, good_pixels
+        print(f"Mean over mean background = {np.mean(bg_mean):.0f}")
+        print(f"Std dev over mean background = {np.std(bg_mean):.0f}")
+        return bg_mean, good_pixels
 
     print('No cached background found. Generating new cache.')
 
@@ -100,7 +99,6 @@ def estimate_background(filename_bg_cxd, bg_frames_max, read_cache=True, hist_bi
 
     with h5py.File(f_cache, 'w') as f:
         # f.create_dataset('bg_stack', data=bg_stack) #no need to save the stack twice.
-        f.create_dataset('bg', data=bg_mean) #for backwards compatability
         f.create_dataset('bg_mean', data=bg_mean)
         f.create_dataset('bg_std', data=bg_std)
         f.create_dataset('good_pixels', data=good_pixels)
@@ -115,7 +113,7 @@ def estimate_background(filename_bg_cxd, bg_frames_max, read_cache=True, hist_bi
 
 
 
-    return bg_mean, bg_std, good_pixels, bg_stack, bg_bins, bg_hist
+    return bg_mean, good_pixels
 
 def estimate_flatfield(flatfield_filename, ff_frames_max, bg, good_pixels, read_cache=True):
     print("*************************************")
@@ -429,12 +427,16 @@ if __name__ == "__main__":
     parser.add_argument('-q', '--quiet', action='store_true',
                         help="Don't show plots interactively")
 
+    parser.add_argument('-rc', '--read-cache', action='store_true',
+                        help="Read and use the cache")
+
     args = parser.parse_args()
 
-    bg, bg_std, good_pixels = estimate_background(
-        args.background_filename, args.bg_frames_max, args.filename)
+    bg_mean, good_pixels = estimate_background(
+        args.background_filename, args.bg_frames_max, args.read_cache)
+
     ff, ff_std = estimate_flatfield(
-        args.flatfield_filename, args.ff_frames_max, bg, good_pixels)
+        args.flatfield_filename, args.ff_frames_max, bg_mean, good_pixels)
     roi = guess_ROI(ff, args.flatfield_filename,
                     args.roi_low_limit, args.roi_fraction)
 
@@ -454,7 +456,7 @@ if __name__ == "__main__":
     # Initialise output CXI file
     W = h5writer.H5Writer(f_out)
 
-    cxd_to_h5(args.filename, bg, ff, roi, good_pixels, W, args.percentile_filter, args.percentile_number,
+    cxd_to_h5(args.filename, bg_mean, ff, roi, good_pixels, W, args.percentile_filter, args.percentile_number,
               args.percentile_frames, args.crop_raw, args.min_x, args.max_x, args.min_y, args.max_y, args.skip_raw)
 
     # Write out information on the command used
