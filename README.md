@@ -26,9 +26,9 @@ git clone git@github.com:YellowSub17/h5writer.git
 
 Install Max H. packages. This will add some directories to your path to make some scripts available to run.
 ```
-cd mulpro; python setup.py install; cd ../
-cd h5writer; python setup.py install; cd ../
-cd spts; python setup.py install; cd ../
+cd mulpro; pip install -e .; cd ../
+cd h5writer; pip install -e .; cd ../
+cd spts; pip install -e .; cd ../
 ```
 
 Install the module as a jupyter notebook kernel.
