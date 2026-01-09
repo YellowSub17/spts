@@ -72,6 +72,5 @@ setup(
             include_dirs=[numpy.get_include()],
             ),
         ],
-    
-    scripts = [this_dir+"/spts/scripts/"+s for s in os.listdir(this_dir+"/spts/scripts/") if ((s.endswith(".py") or s.endswith(".sh")) and not (s.startswith(".")))],
+    # scripts = [this_dir+"/spts/scripts/"+s for s in os.listdir(this_dir+"/spts/scripts/") if ((s.endswith(".py") or s.endswith(".sh")) and not (s.startswith(".")))],
 )
