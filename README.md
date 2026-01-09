@@ -35,7 +35,7 @@ Install Max H. packages. This will add some directories to your path to make som
 ```
 cd mulpro; pip install -e .; cd ../
 cd h5writer; pip install -e .; cd ../
-cd spts; pip install -e .; cd ../
+cd spts; pip install -e --no-build-isolation .; cd ../
 ```
 
 Install the module as a jupyter notebook kernel.
