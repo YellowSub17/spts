@@ -24,10 +24,6 @@ conda install -c conda-forge olefile==0.47 -y
 conda install -c conda-forge expiringdict -y
 ```
 
-Activate the environment.
-```
-conda activate spts
-```
 
 Get Max H. packages.
 ```
