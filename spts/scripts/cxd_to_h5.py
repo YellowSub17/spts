@@ -171,7 +171,7 @@ def estimate_flatfield(flatfield_filename, ff_frames_max, bg, good_pixels, read_
 
 
 
-    print("done")
+    print("done.")
 
 
 

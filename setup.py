@@ -42,6 +42,7 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.13',
     ],
 
     keywords='mie scattering single particle',
@@ -55,11 +56,10 @@ setup(
         ]
     },
 
-    install_requires=['numpy', 'scipy', 'h5py', 'h5writer', 'mulpro>=0.1.3'],
+    # install_requires=['numpy', 'scipy', 'h5py', 'h5writer', 'mulpro>=0.1.3'],
 
     extras_require={'mpi': 'mpi4py>=1.3.1',
                     'gui': ['PyQt4', 'pyqtgraph']},
-   
     ext_modules=[
         Extension(
             "spts.denoise",
