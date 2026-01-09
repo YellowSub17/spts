@@ -34,16 +34,15 @@ conda install -c conda-forge typing -y
 
 Get Max H. packages.
 ```
-git clone https://github.com/YellowSub17/spts.git
-git clone https://github.com/YellowSub17/mulpro.git
-git clone https://github.com/YellowSub17/h5writer.git
+git clone git@github.com:YellowSub17/mulpro.git
+git clone git@github.com:YellowSub17/h5writer.git
 ```
 
 Install Max H. packages.
 ```
 cd mulpro; python setup.py install; cd ../
-cd h5writer; python setup.py install; cd ../
 cd spts; python setup.py install; cd ../
+cd h5writer; python setup.py install; cd ../
 ```
 
 Install jupyter notebook kernel.
