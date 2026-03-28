@@ -266,7 +266,8 @@ class Worker:
         if masked_image is not None and success:
             O.add("masked_image", np.asarray(masked_image), 3, pipeline=True)            
         else:
-            O.add("masked_image", np.zeros(shape=image.shape), 3, pipeline=True)
+            O.add("masked_image", np.asarray(image_processed), 3, pipeline=True)
+            # O.add("masked_image", np.zeros(shape=image_processed.shape), 3, pipeline=True)
         O.add("success", success, 0, pipeline=True)
         out_package["6_analyse"] = O.get_dict(self.conf["general"]["output_level"], self.pipeline_mode)
         tmp_package["6_analyse"] = O.get_dict(5, True)

@@ -2,6 +2,7 @@ import numpy as np
 
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 
+
 import spts.gui.ui as ui
 
 class Preferences:

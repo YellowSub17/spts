@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm
 import matplotlib.patches
 from matplotlib.colors import LogNorm
+import time
 
 
 def estimate_background(filename_bg_cxd, bg_frames_max, read_cache=True, hist_bins=100):
@@ -131,11 +132,10 @@ def estimate_flatfield(flatfield_filename, ff_frames_max, bg, good_pixels, read_
         print("Reading cached flat field from %s" % (f_cache))
         with h5py.File(f_cache, 'r') as f:
             ff = f['ff'][:]
-            ff_std = f['ff_std'][:]
 
         print("Mean over median flatfield = %.0f" % (np.mean(ff)))
         print("Std dev over median flatfield = %.0f" % (np.std(ff)))
-        return ff, ff_std
+        return ff
 
     print('No cached flatfield found. Generating new cache.')
 
@@ -197,8 +197,7 @@ def estimate_flatfield(flatfield_filename, ff_frames_max, bg, good_pixels, read_
         f.create_dataset('ff_std', data=ff_std) #std through image axis: shape=2048x2048
 
 
-
-    return ff, ff_std
+    return ff
 
 
 def guess_ROI(ff, flatfield_filename, ff_low_limit, roi_fraction):
@@ -296,12 +295,7 @@ def cxd_to_h5(filename_cxd,  bg, ff, roi, good_pixels, filename_cxi, do_percent_
     frames = map(R.get_frame, [i for i in range(N)])
     print('done.')
     for i, frame in enumerate(frames):
-    # Write frames
-    # for i in range(N):
-
-
-
-
+  
         bg_corr = None
         if(do_percent_filter):
             # Replace background with percentile filter
@@ -430,13 +424,17 @@ if __name__ == "__main__":
     parser.add_argument('-rc', '--read-cache', action='store_true',
                         help="Read and use the cache")
 
+
     args = parser.parse_args()
+
+
 
     bg_mean, good_pixels = estimate_background(
         args.background_filename, args.bg_frames_max, args.read_cache)
 
-    ff, ff_std = estimate_flatfield(
+    ff = estimate_flatfield(
         args.flatfield_filename, args.ff_frames_max, bg_mean, good_pixels)
+
     roi = guess_ROI(ff, args.flatfield_filename,
                     args.roi_low_limit, args.roi_fraction)
 
@@ -453,6 +451,7 @@ if __name__ == "__main__":
     else:
         f_out = args.filename[:-4] + ".cxi"
 
+    t1 = time.time()
     # Initialise output CXI file
     W = h5writer.H5Writer(f_out)
 
@@ -468,3 +467,6 @@ if __name__ == "__main__":
     W.close()
     if args.skip_raw:
         h5py.File(f_out,'r+')['entry_1']['data_1']['data'] = h5py.SoftLink('/entry_1/image_1/data')
+
+    t2 = time.time()
+    print(f'Total time: {round((t2-t1)/60, 3)} minutes.')
