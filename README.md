@@ -7,6 +7,7 @@ Clone this repo.
 ```
 git clone git@github.com:YellowSub17/spts.git
 ```
+ :) :) 
 
 Create a conda environment.
 ```
