@@ -24,7 +24,7 @@ assert f[-4:]=='.cxi', 'first input should be *.cxi'
 n = f[:-4]
 
 
-d = "./"+n+f"_analysis"
+d = f"./{n}_analysis"
 if not os.path.exists(d):
     os.mkdir(d)
 
