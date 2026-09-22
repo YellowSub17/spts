@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python
 import numpy as np
 import argparse
 import os, sys, shutil
@@ -12,9 +12,11 @@ import time
 
 # for f in filenames:
 
+NEW_DATA_DIR = '/home/pat/spts-ana/data/newdata'
+
+
 c = sys.argv[1]
 f = sys.argv[2]
-t = sys.argv[3]
 
 assert c[-5:]=='.conf', 'second input should be *.conf'
 assert f[-4:]=='.cxi', 'first input should be *.cxi'
@@ -22,11 +24,15 @@ assert f[-4:]=='.cxi', 'first input should be *.cxi'
 n = f[:-4]
 
 
-d = "./"+n+f"_analysis_t{t}"
+d = "./"+n+f"_analysis"
 if not os.path.exists(d):
     os.mkdir(d)
 
-cmds = ["cp %s %s/spts.conf" % (c, d), "ln -s ../%s %s/frames.cxi" % (f,d), "cd %s; run_spts.py -v; cd .." % (d)]
+cmds = [
+f"cp {c} {d}/spts.conf",
+f"ln -s {NEW_DATA_DIR}/{f} {d}/frames.cxi",
+f"cd {d}; run_spts.py -v; cd ..",
+        ]
 for cmd in cmds:
     print(cmd)
     os.system(cmd)
