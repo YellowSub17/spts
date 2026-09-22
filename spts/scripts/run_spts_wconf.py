@@ -14,6 +14,7 @@ import time
 
 c = sys.argv[1]
 f = sys.argv[2]
+t = sys.argv[3]
 
 assert c[-5:]=='.conf', 'second input should be *.conf'
 assert f[-4:]=='.cxi', 'first input should be *.cxi'
@@ -21,7 +22,7 @@ assert f[-4:]=='.cxi', 'first input should be *.cxi'
 n = f[:-4]
 
 
-d = "./"+n+"_analysis"
+d = "./"+n+f"_analysis_t{t}"
 if not os.path.exists(d):
     os.mkdir(d)
 

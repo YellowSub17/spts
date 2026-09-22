@@ -42,7 +42,7 @@ def estimate_background(filename_bg_cxd, bg_frames_max, read_cache=True, hist_bi
             good_pixels = f['good_pixels'][:]
         print(f"Mean over mean background = {np.mean(bg_mean):.0f}")
         print(f"Std dev over mean background = {np.std(bg_mean):.0f}")
-        return bg_mean, good_pixels
+        return None, None, bg_mean, good_pixels
 
     print('No cached background found. Generating new cache.')
 
@@ -113,8 +113,7 @@ def estimate_background(filename_bg_cxd, bg_frames_max, read_cache=True, hist_bi
 
 
 
-
-    return bg_mean, good_pixels
+    return bg_mean, good_pixels, bg_bins, bg_hist
 
 def estimate_flatfield(flatfield_filename, ff_frames_max, bg, good_pixels, read_cache=True):
     print("*************************************")
@@ -324,7 +323,7 @@ def cxd_to_h5(filename_cxd,  bg, ff, roi, good_pixels, filename_cxi, do_percent_
             out["entry_1"]["image_1"] = {"data": image_bgcor.astype(np.float16)}
 
         # Write to disc
-        W.write_slice(out)
+        filename_cxi.write_slice(out)
 
         if integrated_raw is None:
             integrated_raw = np.zeros(shape=image_raw.shape, dtype='float32')
@@ -369,14 +368,13 @@ def cxd_to_h5(filename_cxd,  bg, ff, roi, good_pixels, filename_cxi, do_percent_
     out["entry_1"]["image_1"]["good_pixels"] = good_pixels[roi]
     out["entry_1"]["image_1"]["roi"] = [
         roi[0].start, roi[0].stop, roi[1].start, roi[1].stop]
-    W.write_solo(out)
+    filename_cxi.write_solo(out)
     # Close readers
     R.close()
 
     print("done.")
 
-
-if __name__ == "__main__":
+def main():
 
     parser = argparse.ArgumentParser(
         description='Conversion of CXD (Hamamatsu file format) to HDF5')
@@ -421,7 +419,7 @@ if __name__ == "__main__":
     parser.add_argument('-q', '--quiet', action='store_true',
                         help="Don't show plots interactively")
 
-    parser.add_argument('-rc', '--read-cache', action='store_true',
+    parser.add_argument('-rc', '--read-cache', default=True, action='store_true',
                         help="Read and use the cache")
 
 
@@ -429,7 +427,7 @@ if __name__ == "__main__":
 
 
 
-    bg_mean, good_pixels = estimate_background(
+    bg_mean, good_pixels, _, _ = estimate_background(
         args.background_filename, args.bg_frames_max, args.read_cache)
 
     ff = estimate_flatfield(
@@ -470,3 +468,11 @@ if __name__ == "__main__":
 
     t2 = time.time()
     print(f'Total time: {round((t2-t1)/60, 3)} minutes.')
+
+
+
+
+
+if __name__ == "__main__":
+    main()
+
