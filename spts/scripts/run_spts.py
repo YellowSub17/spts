@@ -47,8 +47,8 @@ if __name__ == "__main__":
         parser.error("Specifying cores > 1 is only permitted when not running with MPI. ")
     
     if args.mpi:
-        import mpi4py
-        comm = mpi4py.MPI.COMM_WORLD
+        from mpi4py import MPI
+        comm = MPI.COMM_WORLD
         is_worker = comm.rank > 0
         H = h5writer.H5WriterMPISW("./spts.cxi", comm=comm, chunksize=100, compression=None)
         if is_worker:
