@@ -1,6 +1,12 @@
 def _init():
     import logging, sys
 
+    # Registers hdf5plugin's bundled filter plugins (blosc/lz4/zstd/etc.) with
+    # HDF5's plugin search path as an import-time side effect. Without this,
+    # reading datasets written with a non-builtin compression filter fails with
+    # "Can't synchronously read data (can't open directory .../hdf5/plugin)".
+    import hdf5plugin
+
     global logger
     logger = logging.getLogger('spts')
 
