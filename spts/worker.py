@@ -149,7 +149,10 @@ class Worker:
         log_info(logger, "(%i/%i) Denoise image" % (i+1, self.N_arr))
         self._update_denoiser()
         image_denoised = self.denoiser.denoise_image(image, full_output=True)
-        O.add("image_denoised", np.asarray(image_denoised, dtype=np.float16), 4, pipeline=True)
+        # float32, not float16: h5writer's MPI transfer (h5writer_mpi_sw.py) has no
+        # MPI datatype mapping for float16 and raises "Data type float16 not
+        # supported" whenever this field is included (output_level >= 4) under -m.
+        O.add("image_denoised", np.asarray(image_denoised, dtype=np.float32), 4, pipeline=True)
         success = True
         O.add("success", success, 0, pipeline=True)        
         out_package["3_denoise"] = O.get_dict(self.conf["general"]["output_level"], self.pipeline_mode)
