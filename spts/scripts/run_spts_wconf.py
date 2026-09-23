@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 NEW_DATA_DIR = Path('/home/pat/spts-ana/data/newdata')
+DATA_DIR = Path('/home/pat/spts-ana/data/')
 
 
 def parse_args():
@@ -48,7 +49,7 @@ def main():
     args = parse_args()
 
     number = extract_number(args.cxi)
-    analysis_dir = Path("%s_analysis_%s" % (number, args.conf.stem))
+    analysis_dir = DATA_DIR / Path("data%s_%s" % (number, args.conf.stem))
     analysis_dir.mkdir(exist_ok=True)
 
     conf_dest = analysis_dir / "spts.conf"

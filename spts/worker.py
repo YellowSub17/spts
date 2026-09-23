@@ -1,5 +1,6 @@
 import numpy as np
 import h5py
+import hdf5plugin
 
 import logging
 logger = logging.getLogger(__name__)
