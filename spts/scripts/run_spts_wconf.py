@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -17,7 +18,26 @@ def parse_args():
     parser.add_argument("conf", type=Path, help="Path to the *.conf file.")
     parser.add_argument("cxi", type=Path,
                         help="Name of the *.cxi file (expected to live in %s)." % NEW_DATA_DIR)
+    parser.add_argument("-m", "--mpi", action="store_true",
+                        help="Run under MPI (mpirun -n <ranks> run_spts.py -m) instead of "
+                             "single-process. Cannot be combined with -c/--cores.")
+    parser.add_argument("-n", "--mpi-ranks", type=int, default=None,
+                        help="Number of MPI ranks to use with --mpi. Rank 0 is a dedicated "
+                             "writer and does no detection work, so use at least 2. Defaults "
+                             "to $SLURM_NTASKS if set, else 2.")
+    parser.add_argument("-c", "--cores", type=int, default=None,
+                        help="Run with local multiprocessing across this many cores "
+                             "(run_spts.py -c N). Cannot be combined with -m/--mpi.")
     args = parser.parse_args()
+
+    if args.mpi and args.cores:
+        parser.error("-m/--mpi and -c/--cores are mutually exclusive.")
+    if args.mpi:
+        if args.mpi_ranks is None:
+            args.mpi_ranks = int(os.environ.get("SLURM_NTASKS", 2))
+        if args.mpi_ranks < 2:
+            parser.error("MPI mode needs at least 2 ranks (rank 0 is a dedicated writer "
+                         "with no workers otherwise), got: %i" % args.mpi_ranks)
 
     if args.conf.suffix != ".conf":
         parser.error("conf file must have a .conf extension, got: %s" % args.conf)
@@ -66,7 +86,14 @@ def main():
         run(["ln", "-s", str(cxi_source), str(frames_dest)])
 
     run(["cp", str(args.conf), str(conf_dest)])
-    run(["run_spts.py", "-v"], cwd=analysis_dir)
+
+    if args.mpi:
+        cmd = ["mpirun", "-n", str(args.mpi_ranks), "run_spts.py", "-v", "-m"]
+    elif args.cores:
+        cmd = ["run_spts.py", "-v", "-c", str(args.cores)]
+    else:
+        cmd = ["run_spts.py", "-v"]
+    run(cmd, cwd=analysis_dir)
 
 
 if __name__ == "__main__":
