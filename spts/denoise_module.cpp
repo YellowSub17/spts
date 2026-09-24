@@ -246,7 +246,7 @@ static PyMethodDef DenoiseMethods[] = {
         NULL,                   /* m_free */
   };
 
-PyMODINIT_FUNC PyInit_initdenoise(void)
+PyMODINIT_FUNC PyInit_denoise(void)
 {
   /* Initialize NumPy C-API */
   import_array();

@@ -1,5 +1,5 @@
 import numpy as np
-from bhmie import bhmie
+from .bhmie import bhmie
 
 wavelength = 532.E-9
 NA = 0.055

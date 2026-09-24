@@ -224,7 +224,7 @@ static PyMethodDef DenoiseMethods[] = {
         NULL,                   /* m_free */
   };
 
-PyMODINIT_FUNC PyInit_initdenoise(void)
+PyMODINIT_FUNC PyInit_denoise(void)
 {
   import_array();
 
